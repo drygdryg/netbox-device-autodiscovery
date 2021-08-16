@@ -1,0 +1,13 @@
+[netbox]
+url = "https://netbox.example.com"
+api_token = "k8yj25sc9s4xveqodjdo6awasxh75fk128m7ybac"
+default_devices_site = "Autodiscovered devices"
+
+[discovery]
+nmap_guess_os = true
+nmap_additional_args = "-T4 -n"
+
+[logging]
+file = false
+console = true
+log_level = "info"
