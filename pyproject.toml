@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "netbox-device-autodiscovery"
+version = "0.1.0"
+description = ""
+authors = ["Victor Golovanenko <drygdryg2014@yandex.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+toml = ">=0.10.2"
+python-nmap = "0.6.4"
+pynetbox = "^6.1.3"
+requests = ">=2.26.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
