@@ -220,7 +220,7 @@ def recognize_device(ip_addr: str, open_ports: List[int], os_matches: List[dict]
         if (os_class['vendor'] == 'Microsoft') and (os_class['osfamily'] == 'Windows'):
             return Device('Generic', 'PC', 'PC', 'Windows')
         # Apple PC
-        if (os_class['vendor'] == 'Apple') and (os_class['osfamily'] == 'OS X'):
+        if (os_class['vendor'] == 'Apple') and (os_class['osfamily'] in ('OS X', 'Mac OS X')):
             return Device('Apple', 'PC', 'PC', 'macOS')
     elif os_class_type == 'switch':
         role = 'Switch'
