@@ -213,8 +213,6 @@ def recognize_device(ip_addr: str, open_ports: List[int], os_matches: List[dict]
     os_name = os_match['name']
     os_class = os_match['osclass'][0]
     os_class_type = os_class['type']
-    if ip_addr == '172.20.21.43':
-        print(os_class)
     if os_class_type == 'general purpose':
         # Microsoft Windows PC
         if (os_class['vendor'] == 'Microsoft') and (os_class['osfamily'] == 'Windows'):
