@@ -4,7 +4,6 @@ from collections import namedtuple, defaultdict
 from typing import List, Optional
 
 import pynetbox
-import requests as requests
 from nmap import PortScanner, PortScannerError
 
 from configuration import config
@@ -240,10 +239,10 @@ def recognize_device(ip_addr: str, open_ports: List[int], os_matches: List[dict]
                     return Device(manufacturer, 'IOS router', role, os_class['osfamily'])
         elif os_class_type == 'printer':
             role = 'Printer'
-            if os_class['vendor'] == 'HP':
-                return Device('HP', 'printer', role, None)
-            elif (80 in open_ports) and (device := recognize_by_http(ip_addr, 80)):
+            if (80 in open_ports) and (device := recognize_by_http(ip_addr, 80)):
                 return device
+            elif os_class['vendor'] in ('HP', 'Zebra'):
+                return Device(os_class['vendor'], 'printer', role, None)
             else:
                 return Device('Generic', 'printer', role, None)
         elif os_class_type == 'specialized':
