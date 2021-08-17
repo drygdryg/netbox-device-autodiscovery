@@ -1,6 +1,7 @@
 import string
 from typing import List
 from itertools import groupby
+from collections import namedtuple
 
 
 def truncate(text: str = "", max_len: int = 50) -> str:
@@ -54,3 +55,6 @@ def args2str(args: List[str], sep=' ') -> str:
 def remove_duplicates(lst: list) -> list:
     # return [i for n, i in enumerate(lst) if i not in lst[n + 1:]]
     return [key for key, group in groupby(lst, lambda x: x)]
+
+
+Device = namedtuple('Device', ('manufacturer', 'model', 'role', 'platform'), defaults=(None, None, None, None))
