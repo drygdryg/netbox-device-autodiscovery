@@ -25,6 +25,9 @@ def recognize_by_http(ip: str, port=80, http_timeout=3) -> Optional[Device]:
     # Recognize device by the response body
     if 'SeWoo Ethernet IP Config' in r.text:
         return Device('SeWoo', 'printer', 'Printer', None)
+    elif (('TP-Link Corporation Limited.' in r.text) or ('TP-Link Technologies Co., Ltd.' in r.text)) and \
+         ('g_Lan = 385;' in r.text):
+        return Device('TP-Link', 'switch', 'Switch', None)
     elif ('Zebra Technologies' in r.text) and (match := re.search(r'ZTC ([\w-]+)', r.text)):
         return Device('Zebra', match.group(1), 'Printer', None)
     elif 'KYOCERA MITA' in r.text:
