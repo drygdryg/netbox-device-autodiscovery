@@ -7,8 +7,7 @@ import subprocess
 from typing import Optional
 
 from logger import log
-from netbox_templates import NetBoxTemplate
-from shared_objects import NB_DEFAULT_SITE
+from shared_objects import netbox_template
 
 
 class Module:
@@ -29,23 +28,16 @@ class Module:
         table_rows = list(line.strip().split() for line in p.stdout.splitlines()[3:])
         online_phones = [p[3] for p in table_rows if p[0] == 'established']
 
-        nbt = NetBoxTemplate(
-            default_tags=[{
-                'name': 'Autodiscovered'
-            }]
-        )
         nb_objects = {
-            'manufacturers': [nbt.manufacturer('Avaya')],
-            'device_types': [nbt.device_type('Avaya', 'VoIP phone')],
+            'manufacturers': [netbox_template.manufacturer('Avaya')],
+            'device_types': [netbox_template.device_type('Avaya', 'VoIP phone')],
             'devices': [], 'interfaces': [], 'ip_addresses': []
         }
         for ip in online_phones:
             nb_objects['devices'].append(
-                nbt.device(
-                    name=ip, device_role='VoIP phone', manufacturer='Avaya', model='VoIP phone', site=NB_DEFAULT_SITE
-                ))
-            nb_objects['interfaces'].append(nbt.device_interface(device=ip, name='vNIC'))
+                netbox_template.device(name=ip, device_role='VoIP phone', manufacturer='Avaya', model='VoIP phone'))
+            nb_objects['interfaces'].append(netbox_template.device_interface(device=ip, name='vNIC'))
             nb_objects['ip_addresses'].append(
-                nbt.ip_address(ip + '/32', device=ip, interface='vNIC'))
+                netbox_template.ip_address(ip + '/32', device=ip, interface='vNIC'))
 
         return nb_objects

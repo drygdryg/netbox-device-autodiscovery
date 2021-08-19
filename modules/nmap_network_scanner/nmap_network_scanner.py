@@ -6,8 +6,7 @@ from nmap import PortScanner, PortScannerError
 
 from logger import log
 from .active_recognition import recognize_by_http
-from netbox_templates import NetBoxTemplate
-from shared_objects import nb, Device, NB_DEFAULT_SITE
+from shared_objects import nb, Device, netbox_template
 from utils import remove_duplicates
 
 
@@ -119,11 +118,6 @@ class Module:
 
     def process_scan_results(self, nmap_results: dict) -> dict:
         """Converts the results of an Nmap network scan to NetBox entities"""
-        nbt = NetBoxTemplate(
-            default_tags=[{
-                'name': 'Autodiscovered'
-            }]
-        )
         log.info('Converting Nmap scan results to NetBox objects…')
         nb_objects = defaultdict(list)
         for ip, scan_results in nmap_results.items():
@@ -139,26 +133,26 @@ class Module:
                 log.info('Failed to recognize the device, skipped')
                 continue
 
-            nb_objects['manufacturers'].append(nbt.manufacturer(recognized_device.manufacturer))
-            nb_objects['device_types'].append(nbt.device_type(recognized_device.manufacturer, recognized_device.model))
+            nb_objects['manufacturers'].append(netbox_template.manufacturer(recognized_device.manufacturer))
+            nb_objects['device_types'].append(
+                netbox_template.device_type(recognized_device.manufacturer, recognized_device.model))
             if recognized_device.platform:
-                nb_objects['platforms'].append(nbt.platform(recognized_device.platform))
+                nb_objects['platforms'].append(netbox_template.platform(recognized_device.platform))
 
             # Use IP address as the device name
             device_name = ip
             nb_objects['devices'].append(
-                nbt.device(
+                netbox_template.device(
                     name=device_name, device_role=recognized_device.role, manufacturer=recognized_device.manufacturer,
-                    model=recognized_device.model, site=NB_DEFAULT_SITE, platform=recognized_device.platform
+                    model=recognized_device.model, platform=recognized_device.platform
                 ))
-            nb_objects['interfaces'].append(nbt.device_interface(device=device_name, name='vNIC'))
+            nb_objects['interfaces'].append(netbox_template.device_interface(device=device_name, name='vNIC'))
 
             dns_name = scan_results['hostnames'][0]['name'] if scan_results['hostnames'][0]['name'] else None
             nb_objects['ip_addresses'].append(
-                nbt.ip_address(ip + '/32', device=device_name, interface='vNIC', dns_name=dns_name))
+                netbox_template.ip_address(ip + '/32', device=device_name, interface='vNIC', dns_name=dns_name))
             log.info(
                 'Device recognized: {}'.format(
                     ', '.join('='.join((k, str(v))) for k, v in recognized_device._asdict().items()))
             )
-
         return {k: remove_duplicates(v) for k, v in nb_objects.items()}

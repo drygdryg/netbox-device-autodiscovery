@@ -5,11 +5,13 @@ from utils import truncate, format_slug, remove_empty_fields, remove_duplicates
 
 class NetBoxTemplate:
     """Templates for for rapid creation of NetBox objects"""
-    def __init__(self, default_tags: Optional[List[dict]] = None):
+    def __init__(self, default_tags: Optional[List[dict]] = None, default_site: Optional[str] = None):
         """
         :param default_tags: Default tags for attaching to all objects with tags
+        :param default_site: Default site for placing devices in it
         """
         self.default_tags = default_tags
+        self.default_site = default_site
 
     def __merge_default_tags__(self, tags: List[dict]):
         if self.default_tags:
@@ -52,7 +54,7 @@ class NetBoxTemplate:
         }
         return remove_empty_fields(obj)
 
-    def device(self, name: str, device_role: str, manufacturer: str, model: str, site: str,
+    def device(self, name: str, device_role: str, manufacturer: str, model: str, site: Optional[str] = None,
                platform: Optional[str] = None, serial: Optional[str] = None, asset_tag: Optional[str] = None,
                status: Optional[str] = None, tags: Optional[List[dict]] = None) -> dict:
         """
@@ -69,12 +71,16 @@ class NetBoxTemplate:
         :param status: NetBox IP address status in NB API v2.6 format
         :param tags: Tags to apply to the object
         """
+        if not site:
+            if not self.default_site:
+                raise ValueError("You must pass the site argument or configure the default site")
+            site = self.default_site
         obj = {
             "name": name,
             "device_role": {"name": device_role},
             "device_type": {"manufacturer": {'name': manufacturer}, "model": model},
             "platform": {"name": platform} if platform else None,
-            "site": {"name": site} if site else None,
+            "site": {"name": site},
             "serial": truncate(serial, max_len=50) if serial else None,
             "asset_tag": truncate(asset_tag, max_len=50) if asset_tag else None,
             "status": status or "active",
