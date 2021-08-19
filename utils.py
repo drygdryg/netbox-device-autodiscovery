@@ -46,14 +46,6 @@ def remove_empty_fields(obj: dict) -> dict:
     return {k: v for k, v in obj.items() if v is not None}
 
 
-def args2str(args: List[str], sep=' ') -> str:
-    """Converts list of command line arguments into a string"""
-    return sep.join(args)
-
-
 def remove_duplicates(lst: list) -> list:
     return [i for n, i in enumerate(lst) if i not in lst[n + 1:]]
     # return [key for key, group in itertools.groupby(lst, lambda x: x)]
-
-
-Device = namedtuple('Device', ('manufacturer', 'model', 'role', 'platform'), defaults=(None, None, None, None))

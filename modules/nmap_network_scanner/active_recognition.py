@@ -4,7 +4,7 @@ from typing import Optional
 import requests
 from lxml import html
 
-from utils import Device
+from shared_objects import Device
 
 
 def safe_http_get(url, params: dict = None, timeout=3, **kwargs) -> Optional[requests.Response]:

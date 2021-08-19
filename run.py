@@ -1,20 +1,14 @@
 import argparse
-import re
 from collections import namedtuple, defaultdict
-from typing import List, Optional
 
 import pynetbox
-from nmap import PortScanner, PortScannerError
 
 from configuration import config
-from netbox_templates import NetBoxTemplate
-from active_recognition import recognize_by_http
-from utils import args2str, format_slug, remove_duplicates, Device
+from shared_objects import NB_DEFAULT_SITE
+from utils import format_slug
 from logger import log
 
 nb = pynetbox.api(url=config['netbox']['url'], token=config['netbox']['api_token'])
-
-NB_DEFAULT_SITE = config['netbox']['default_devices_site']
 
 # Properties of NetBox object types
 NetBoxObjectProperties = namedtuple('NetBoxObjectProperties', ('api_app', 'api_model', 'key'))
@@ -43,7 +37,8 @@ def verify_prerequisites():
             {'name': 'Router', 'slug': 'router'},
             {'name': 'Switch', 'slug': 'switch'},
             {'name': 'Printer', 'slug': 'printer'},
-            {'name': 'MFP', 'slug': 'mfp'}
+            {'name': 'MFP', 'slug': 'mfp'},
+            {'name': 'VoIP phone', 'slug': 'voip-phone'}
         ],
         'sites': [
             {
@@ -180,160 +175,52 @@ def create_or_update_nb_obj(obj_type: str, obj: dict) -> int:
         return created_nb_obj.id
 
 
-def scan_networks(prefixes: List[str]) -> Optional[dict]:
-    """Scan given networks using the Network mapper and detect hardware platforms and operating systems"""
-    # Initialize Nmap scanner
-    try:
-        nmap = PortScanner()
-    except PortScannerError as error:
-        log.error("Nmap scanner critical error occurred: %s", error.value)
-        return
-    nmap_arguments = ['-sS', '-O']
-    if config['discovery']['nmap_guess_os']:
-        nmap_arguments.append('--osscan-guess')
-    nmap_arguments.extend(config['discovery']['nmap_additional_args'].split(' '))
-
-    log.info('Network scanning started')
-    scan_results = nmap.scan(args2str(prefixes), arguments=args2str(nmap_arguments), sudo=True)
-    return scan_results['scan']
-
-
-def recognize_device(ip_addr: str, open_ports: List[int], os_matches: List[dict]) -> Optional[Device]:
-    """
-    Recognizes device model, operating system, based on the result of scanning the host using Nmap
-
-    :param ip_addr: IP addresses of the host
-    :param open_ports: List of open TCP ports
-    :param os_matches: Nmap OS detection results
-    """
-    os_match = os_matches[0]
-    os_name = os_match['name']
-    os_class = os_match['osclass'][0]
-    os_class_type = os_class['type']
-    if int(os_match['accuracy']) >= 85:
-        if os_class_type == 'general purpose':
-            # Microsoft Windows PC
-            if (os_class['vendor'] == 'Microsoft') and (os_class['osfamily'] == 'Windows'):
-                return Device('Generic', 'PC', 'PC', 'Windows')
-            # Apple PC
-            if (os_class['vendor'] == 'Apple') and (os_class['osfamily'] in ('OS X', 'Mac OS X')):
-                return Device('Apple', 'PC', 'PC', 'macOS')
-        elif os_class_type == 'switch':
-            role = 'Switch'
-            # Cisco switches
-            if os_class['vendor'] == 'Cisco':
-                manufacturer = 'Cisco'
-                if os_name.startswith('Cisco Nexus'):
-                    model = re.match(r'Cisco (Nexus(?: \d+)?)', os_name).group(1)
-                    platform = os_class['osfamily']
-                    return Device(manufacturer, model, role, platform)
-                elif os_name.startswith('Cisco Catalyst'):
-                    model = re.match(r'Cisco (Catalyst(?: [\w-]+)?) switch', os_name).group(1)
-                    platform = os_class['osfamily']
-                    return Device(manufacturer, model, role, platform)
-        elif os_class_type == 'router':
-            role = 'Router'
-            if os_class['vendor'] == 'Cisco':
-                manufacturer = 'Cisco'
-                if os_name.startswith('Cisco IOS'):
-                    return Device(manufacturer, 'IOS router', role, os_class['osfamily'])
-        elif os_class_type == 'printer':
-            role = 'Printer'
-            if (80 in open_ports) and (device := recognize_by_http(ip_addr, 80)):
-                return device
-            elif os_class['vendor'] in ('HP', 'Zebra'):
-                return Device(os_class['vendor'], 'printer', role, None)
-            else:
-                return Device('Generic', 'printer', role, None)
-        elif os_class_type == 'specialized':
-            pass
-    else:
-        log.info(f"OS match accuracy too low {os_match['accuracy']}, OS fingerprint recognition is skipped…")
-    # Generic cases
-    if 80 in open_ports:
-        if device := recognize_by_http(ip_addr, 80):
-            return device
-    if 515 in open_ports:
-        return Device('Generic', 'printer', 'Printer', None)
-
-
-def process_scan_results(nmap_results: dict) -> dict:
-    """Converts the results of an Nmap network scan to NetBox entities"""
-    nbt = NetBoxTemplate(
-        default_tags=[{
-            'name': 'Autodiscovered'
-        }]
-    )
-    log.info('Converting Nmap scan results to NetBox objects…')
-    nb_objects = defaultdict(list)
-    for ip, scan_results in nmap_results.items():
-        log.info(f'Recognition of the device with IP {ip} is started…')
-        if not scan_results['osmatch']:
-            log.info(f'No OS matches found, IP {ip} skipped')
-            continue
-
-        open_ports = [port for port, qualities in scan_results['tcp'].items() if qualities['state'] == 'open'] if 'tcp' in scan_results else []
-        recognized_device = recognize_device(ip, open_ports, scan_results['osmatch'])
-        if not recognized_device:
-            log.info('Failed to recognize the device, skipped')
-            continue
-
-        nb_objects['manufacturers'].append(nbt.manufacturer(recognized_device.manufacturer))
-        nb_objects['device_types'].append(nbt.device_type(recognized_device.manufacturer, recognized_device.model))
-        if recognized_device.platform:
-            nb_objects['platforms'].append(nbt.platform(recognized_device.platform))
-
-        # Use IP address as the device name
-        device_name = ip
-        nb_objects['devices'].append(
-            nbt.device(
-                name=device_name, device_role=recognized_device.role, manufacturer=recognized_device.manufacturer,
-                model=recognized_device.model, site=NB_DEFAULT_SITE, platform=recognized_device.platform
-            ))
-        nb_objects['interfaces'].append(nbt.device_interface(device=device_name, name='vNIC'))
-
-        dns_name = scan_results['hostnames'][0]['name'] if scan_results['hostnames'][0]['name'] else None
-        nb_objects['ip_addresses'].append(
-            nbt.ip_address(ip + '/32', device=device_name, interface='vNIC', dns_name=dns_name))
-        log.info(
-            'Device recognized: {}'.format(
-                ', '.join('='.join((k, str(v))) for k, v in recognized_device._asdict().items()))
-        )
-
-    return {k: remove_duplicates(v) for k, v in nb_objects.items()}
+def cleanup():
+    """Remove all auto discovered objects which support tagging from NetBox"""
+    autodiscovered_tag = nb.extras.tags.get(name='Autodiscovered')
+    for obj_type in NETBOX_OBJECTS_DELETION_ORDER:
+        log.info("Initiated deletion of %s objects from NetBox", obj_type)
+        api_app = NETBOX_OBJECTS_PROPERTIES[obj_type].api_app
+        all_objects = [obj for obj in getattr(getattr(nb, api_app), obj_type).all() if
+                       autodiscovered_tag in obj.tags]
+        for obj in all_objects:
+            log.info(
+                "Deleting '%s' object of type '%s'",
+                getattr(obj, NETBOX_OBJECTS_PROPERTIES[obj_type].key), obj_type)
+            try:
+                obj.delete()
+            except pynetbox.core.query.RequestError:
+                log.warning('Failed to delete the object')
 
 
 def main():
     # Check prerequisites
     verify_prerequisites()
 
-    # Obtain IP prefixes to scan, excluding prefixes with "Do not autodiscover" tag
-    autodiscovery_disabled_tag = nb.extras.tags.get(slug='do-not-autodiscover')
-    target_prefixes = [p.prefix for p in nb.ipam.prefixes.all() if autodiscovery_disabled_tag not in p.tags]
-
-    # Scan networks
-    hosts = scan_networks(target_prefixes)
-    if not hosts:
-        log.error("A critical error occurred while scanning the network, stopping")
-        return
-
-    # Filter out VMWare vCenter IPs
-    vcenter_tag = nb.extras.tags.get(name='vCenter')
-    vcenter_ips = [ip.address.split('/')[0] for ip in nb.ipam.ip_addresses.all() if vcenter_tag in ip.tags]
-    hosts = {ip: related for ip, related in hosts.items() if ip not in vcenter_ips}
-
-    # NetBox objects to verify, and create or update
-    nb_objects = process_scan_results(hosts)
     # List of IDs of affected NetBox objects
     affected_nb_objects = defaultdict(list)
-    for obj_type in NETBOX_OBJECTS_CREATION_ORDER:
-        if obj_type not in nb_objects:
+
+    # Run modules and process results
+    for module_name in config['data_sources']['modules']:
+        log.info(f'Running module "{module_name}"…')
+        module_config = config[module_name]
+        module = __import__(f'modules.{module_name}')
+        m = getattr(module, module_name).Module(module_config)
+        # NetBox objects to verify, and create or update
+        nb_objects = m.run()
+        if not nb_objects:
+            log.warning(f'Execution of the module "{module_name}" yielded no results')
             continue
-        log.info("Initiated sync of %s objects to NetBox", obj_type)
-        for obj in nb_objects[obj_type]:
-            obj_id = create_or_update_nb_obj(obj_type, obj)
-            affected_nb_objects[obj_type].append(obj_id)
-        log.info("Finished sync of %s objects to NetBox", obj_type)
+
+        for obj_type in NETBOX_OBJECTS_CREATION_ORDER:
+            if obj_type not in nb_objects:
+                continue
+            log.info("Initiated sync of %s objects to NetBox", obj_type)
+            for obj in nb_objects[obj_type]:
+                obj_id = create_or_update_nb_obj(obj_type, obj)
+                affected_nb_objects[obj_type].append(obj_id)
+            log.info("Finished sync of %s objects to NetBox", obj_type)
+        log.info(f'Module "{module_name}" execution completed')
 
     log.info('Initialized deletion of orphaned NetBox objects')
     autodiscovered_tag = nb.extras.tags.get(name='Autodiscovered')
@@ -372,19 +259,6 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
     if args.cleanup:
-        autodiscovered_tag = nb.extras.tags.get(name='Autodiscovered')
-        for obj_type in NETBOX_OBJECTS_DELETION_ORDER:
-            log.info("Initiated deletion of %s objects from NetBox", obj_type)
-            api_app = NETBOX_OBJECTS_PROPERTIES[obj_type].api_app
-            all_objects = [obj for obj in getattr(getattr(nb, api_app), obj_type).all() if
-                           autodiscovered_tag in obj.tags]
-            for obj in all_objects:
-                log.info(
-                    "Deleting '%s' object of type '%s'",
-                    getattr(obj, NETBOX_OBJECTS_PROPERTIES[obj_type].key), obj_type)
-                try:
-                    obj.delete()
-                except pynetbox.core.query.RequestError:
-                    log.warning('Failed to delete the object')
+        cleanup()
     else:
         main()
