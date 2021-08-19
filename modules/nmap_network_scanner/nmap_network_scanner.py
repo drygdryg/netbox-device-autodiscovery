@@ -93,6 +93,8 @@ class Module:
                                 return Device(manufacturer, model.group(1), role, platform)
                             else:
                                 return Device(manufacturer, 'Catalyst', role, platform)
+                        else:
+                            return Device(manufacturer, 'switch', role, None)
                 elif os_class_type == 'router':
                     role = 'Router'
                     if os_class['vendor'] == 'Cisco':
