@@ -88,9 +88,11 @@ class Module:
                             platform = os_class['osfamily']
                             return Device(manufacturer, model, role, platform)
                         elif os_name.startswith('Cisco Catalyst'):
-                            model = re.match(r'Cisco (Catalyst(?: [\w-]+)?) switch', os_name).group(1)
                             platform = os_class['osfamily']
-                            return Device(manufacturer, model, role, platform)
+                            if model := re.match(r'Cisco (Catalyst(?: [\w-]+)?) switch', os_name):
+                                return Device(manufacturer, model.group(1), role, platform)
+                            else:
+                                return Device(manufacturer, 'Catalyst', role, platform)
                 elif os_class_type == 'router':
                     role = 'Router'
                     if os_class['vendor'] == 'Cisco':
