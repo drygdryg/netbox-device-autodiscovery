@@ -1,5 +1,5 @@
 import re
-from typing import Optional
+from typing import Optional, Iterable
 
 import requests
 from lxml import html
@@ -14,6 +14,14 @@ def safe_http_get(url, params: dict = None, timeout=3, **kwargs) -> Optional[req
         return
     else:
         return r
+
+
+def str_contains(string: str, substrings: Iterable[str]) -> bool:
+    """Checks whether the string contains all the specified substrings"""
+    for substring in substrings:
+        if substring not in string:
+            return False
+    return True
 
 
 def recognize_by_http(ip: str, port=80, http_timeout=3) -> Optional[Device]:
@@ -49,6 +57,8 @@ def recognize_by_http(ip: str, port=80, http_timeout=3) -> Optional[Device]:
         return Device('HP', f'LaserJet {match.group(1)}', 'MFP', None)
     elif match := re.search(r'HP(?: Color)? LaserJet Pro MFP (\w+)', r.text):
         return Device('HP', f'LaserJet Pro {match.group(1)}', 'MFP', None)
+    elif 'FreeNAS' in r.text:
+        return Device('Generic', 'FreeNAS', 'NAS', 'FreeBSD')
 
     # Try to detect and follow HTML redirect
     if ('Content-Type' in r.headers) and (r.headers['Content-Type'] == 'text/html'):
@@ -56,4 +66,9 @@ def recognize_by_http(ip: str, port=80, http_timeout=3) -> Optional[Device]:
         if url:
             url = url[0][url[0].lower().find('url=') + 4:]
             r = safe_http_get(f'{base_url}/{url}')
-            # TODO
+            if str_contains(r.text, ('Bizerba GmbH & Co. KG', 'Labeler Master', 'homepage.html')):
+                # Bizerba labeling system
+                return Device('Bizerba', 'Labeler master', 'Labeling system', None)
+            elif str_contains(r.text, ('Naim Configuration', 'Mu-so Configuration')):
+                # Naim network audio device
+                return Device('Naim', 'network media device', 'Other', 'Linux')

@@ -68,45 +68,50 @@ class Module:
         """
         os_match = os_matches[0]
         os_name = os_match['name']
-        os_class = os_match['osclass'][0]
-        os_class_type = os_class['type']
         if int(os_match['accuracy']) >= 85:
-            if os_class_type == 'general purpose':
-                # Microsoft Windows PC
-                if (os_class['vendor'] == 'Microsoft') and (os_class['osfamily'] == 'Windows'):
-                    return Device('Generic', 'PC', 'PC', 'Windows')
-                # Apple PC
-                if (os_class['vendor'] == 'Apple') and (os_class['osfamily'] in ('OS X', 'Mac OS X')):
-                    return Device('Apple', 'PC', 'PC', 'macOS')
-            elif os_class_type == 'switch':
-                role = 'Switch'
-                # Cisco switches
-                if os_class['vendor'] == 'Cisco':
-                    manufacturer = 'Cisco'
-                    if os_name.startswith('Cisco Nexus'):
-                        model = re.match(r'Cisco (Nexus(?: \d+)?)', os_name).group(1)
-                        platform = os_class['osfamily']
-                        return Device(manufacturer, model, role, platform)
-                    elif os_name.startswith('Cisco Catalyst'):
-                        model = re.match(r'Cisco (Catalyst(?: [\w-]+)?) switch', os_name).group(1)
-                        platform = os_class['osfamily']
-                        return Device(manufacturer, model, role, platform)
-            elif os_class_type == 'router':
-                role = 'Router'
-                if os_class['vendor'] == 'Cisco':
-                    manufacturer = 'Cisco'
-                    if os_name.startswith('Cisco IOS'):
-                        return Device(manufacturer, 'IOS router', role, os_class['osfamily'])
-            elif os_class_type == 'printer':
-                role = 'Printer'
-                if (80 in open_ports) and (device := recognize_by_http(ip_addr, 80)):
-                    return device
-                elif os_class['vendor'] in ('HP', 'Zebra'):
-                    return Device(os_class['vendor'], 'printer', role, None)
-                else:
-                    return Device('Generic', 'printer', role, None)
-            elif os_class_type == 'specialized':
-                pass
+            for os_class in os_match['osclass']:
+                os_class_type = os_class['type']
+                if os_class_type == 'general purpose':
+                    # Microsoft Windows PC
+                    if (os_class['vendor'] == 'Microsoft') and (os_class['osfamily'] == 'Windows'):
+                        return Device('Generic', 'PC', 'PC', 'Windows')
+                    # Apple PC
+                    if (os_class['vendor'] == 'Apple') and (os_class['osfamily'] in ('OS X', 'Mac OS X', 'macOS')):
+                        return Device('Apple', 'PC', 'PC', 'macOS')
+                elif os_class_type == 'switch':
+                    role = 'Switch'
+                    # Cisco switches
+                    if os_class['vendor'] == 'Cisco':
+                        manufacturer = 'Cisco'
+                        if os_name.startswith('Cisco Nexus'):
+                            model = re.match(r'Cisco (Nexus(?: \d+)?)', os_name).group(1)
+                            platform = os_class['osfamily']
+                            return Device(manufacturer, model, role, platform)
+                        elif os_name.startswith('Cisco Catalyst'):
+                            model = re.match(r'Cisco (Catalyst(?: [\w-]+)?) switch', os_name).group(1)
+                            platform = os_class['osfamily']
+                            return Device(manufacturer, model, role, platform)
+                elif os_class_type == 'router':
+                    role = 'Router'
+                    if os_class['vendor'] == 'Cisco':
+                        manufacturer = 'Cisco'
+                        if os_name.startswith('Cisco IOS'):
+                            return Device(manufacturer, 'IOS router', role, os_class['osfamily'])
+                elif os_class_type == 'printer':
+                    role = 'Printer'
+                    if (80 in open_ports) and (device := recognize_by_http(ip_addr, 80)):
+                        return device
+                    elif os_class['vendor'] in ('HP', 'Zebra'):
+                        return Device(os_class['vendor'], 'printer', role, None)
+                    else:
+                        return Device('Generic', 'printer', role, None)
+                elif os_class_type == 'WAP':
+                    role = 'Wi-Fi AP'
+                    if os_name.startswith('Ubiquiti WAP'):
+                        return Device('Ubiquiti', 'Wi-Fi access point', role, 'Linux')
+                    return Device('Generic', 'Wi-Fi access point', role, None)
+                elif os_class_type == 'specialized':
+                    pass
         else:
             log.info(f"OS match accuracy too low {os_match['accuracy']}, OS fingerprint recognition is skipped…")
         # Generic cases

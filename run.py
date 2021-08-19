@@ -38,7 +38,11 @@ def verify_prerequisites():
             {'name': 'Switch', 'slug': 'switch'},
             {'name': 'Printer', 'slug': 'printer'},
             {'name': 'MFP', 'slug': 'mfp'},
-            {'name': 'VoIP phone', 'slug': 'voip-phone'}
+            {'name': 'Labeling system', 'slug': 'labeling-system'},
+            {'name': 'NAS', 'slug': 'nas'},
+            {'name': 'Wi-Fi AP', 'slug': 'wi-fi-ap'},
+            {'name': 'VoIP phone', 'slug': 'voip-phone'},
+            {'name': 'Other', 'slug': 'other'}
         ],
         'sites': [
             {
