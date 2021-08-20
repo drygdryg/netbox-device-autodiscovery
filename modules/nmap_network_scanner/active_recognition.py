@@ -41,7 +41,7 @@ def recognize_by_http(ip: str, port=80, http_timeout=3) -> Optional[Device]:
     if 'SeWoo Ethernet IP Config' in r.text:
         return Device('SeWoo', 'printer', 'Printer', None)
     elif (('TP-Link Corporation Limited.' in r.text) or ('TP-Link Technologies Co., Ltd.' in r.text)) and \
-         ('g_Lan = 385;' in r.text):
+            str_contains(r.text, ('var g_Lan', 'var g_year')):
         return Device('TP-Link', 'switch', 'Switch', None)
     elif ('Zebra Technologies' in r.text) and (match := re.search(r'ZTC ([\w-]+)', r.text)):
         return Device('Zebra', match.group(1), 'Printer', None)
@@ -69,6 +69,6 @@ def recognize_by_http(ip: str, port=80, http_timeout=3) -> Optional[Device]:
             if str_contains(r.text, ('Bizerba GmbH & Co. KG', 'Labeler Master', 'homepage.html')):
                 # Bizerba labeling system
                 return Device('Bizerba', 'Labeler master', 'Labeling system', None)
-            elif str_contains(r.text, ('Naim Configuration', 'Mu-so Configuration')):
+            elif ('Naim Configuration' in r.text) or ('Mu-so Configuration' in r.text):
                 # Naim network audio device
                 return Device('Naim', 'network media device', 'Other', 'Linux')
