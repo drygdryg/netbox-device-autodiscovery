@@ -5,7 +5,7 @@ from typing import List, Optional
 from nmap import PortScanner, PortScannerError
 
 from logger import log
-from .active_recognition import recognize_by_http
+from .active_recognition import recognize_by_http, recognize_by_snmp
 from shared_objects import nb, Device, netbox_template
 from utils import remove_duplicates
 
@@ -124,6 +124,9 @@ class Module:
                 return device
         if 515 in open_ports:
             return Device('Generic', 'printer', 'Printer', None)
+        if 161 in open_ports:
+            if device := recognize_by_snmp(ip_addr, 161):
+                return device
 
     def process_scan_results(self, nmap_results: dict) -> dict:
         """Converts the results of an Nmap network scan to NetBox entities"""

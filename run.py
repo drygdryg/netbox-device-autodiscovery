@@ -41,6 +41,9 @@ def verify_prerequisites():
             {'name': 'Labeling system', 'slug': 'labeling-system'},
             {'name': 'NAS', 'slug': 'nas'},
             {'name': 'Wi-Fi AP', 'slug': 'wi-fi-ap'},
+            {'name': 'Wi-Fi Mesh', 'slug': 'wi-fi-mesh'},
+            {'name': 'IP PBX', 'slug': 'ip-pbx'},
+            {'name': 'Server', 'slug': 'server'},
             {'name': 'VoIP phone', 'slug': 'voip-phone'},
             {'name': 'Other', 'slug': 'other'}
         ],
