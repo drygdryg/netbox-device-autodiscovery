@@ -10,8 +10,8 @@ log_level = "info"
 
 [data_sources]
 modules = [
-    "nmap_network_scanner",
-    "avaya_ip_office_phones_enumerator"
+    "avaya_ip_office_phones_enumerator",
+    "nmap_network_scanner"
 ]
 
 [nmap_network_scanner]

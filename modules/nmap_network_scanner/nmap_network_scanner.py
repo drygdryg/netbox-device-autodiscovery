@@ -84,9 +84,8 @@ class Module:
                     if os_class['vendor'] == 'Cisco':
                         manufacturer = 'Cisco'
                         if os_name.startswith('Cisco Nexus'):
-                            model = re.match(r'Cisco (Nexus(?: \d+)?)', os_name).group(1)
                             platform = os_class['osfamily']
-                            return Device(manufacturer, model, role, platform)
+                            return Device(manufacturer, 'Nexus', role, platform)
                         elif os_name.startswith('Cisco Catalyst'):
                             platform = os_class['osfamily']
                             if model := re.match(r'Cisco (Catalyst(?: [\w-]+)?) switch', os_name):
