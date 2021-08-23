@@ -1,5 +1,7 @@
 import re
 from collections import defaultdict
+import ipaddress
+from itertools import groupby
 from typing import List, Optional
 
 from nmap import PortScanner, PortScannerError
@@ -15,6 +17,34 @@ def args2str(args: List[str], sep=' ') -> str:
     return sep.join(args)
 
 
+def integer_ranges(integers: List[int], sep=',') -> str:
+    """Compress list of integers into ranges"""
+    ranges = []
+    for _, i in groupby(enumerate(sorted(integers)), lambda pair: pair[1] - pair[0]):
+        t = list(i)
+        x, y = t[0][1], t[-1][1]
+        ranges.append(str(x) if x == y else f'{x}-{y}')
+    return sep.join(ranges)
+
+
+def filter_networks(networks: List[str], ip_addresses: List[str]) -> List[str]:
+    """Exclude given IP addresses from the given IP networks and return list of networks and addresses"""
+    ip_addrs = [ipaddress.ip_address(ip) for ip in ip_addresses]
+    results = []
+    for net in networks:
+        network = ipaddress.ip_network(net)
+        ips = [ip for ip in network if ip not in ip_addrs]
+        if ips == list(network):
+            # The network does not intersect with the IP addresses
+            results.append(net)
+            continue
+        # Compress list of the target IP addresses into Nmap compact target specification
+        for first_octets, included_ips in groupby(map(str, ips), lambda ip: ip.rsplit('.', maxsplit=1)[0]):
+            last_octet_ranges = integer_ranges([int(ip.rsplit('.', maxsplit=1)[1]) for ip in included_ips])
+            results.append(f'{first_octets}.{last_octet_ranges}')
+    return results
+
+
 class Module:
     def __init__(self, config: dict):
         self.config = config
@@ -25,22 +55,23 @@ class Module:
         autodiscovery_disabled_tag = nb.extras.tags.get(slug='do-not-autodiscover')
         target_prefixes = [p.prefix for p in nb.ipam.prefixes.all() if autodiscovery_disabled_tag not in p.tags]
 
-        # Scan networks
-        hosts = self.scan_networks(target_prefixes)
-        if not hosts:
-            log.error("A critical error occurred while scanning the network, stopping")
-            return
-
         # Filter out VMWare vCenter IPs
         vcenter_tag = nb.extras.tags.get(name='vCenter')
         vcenter_ips = [ip.address.split('/')[0] for ip in nb.ipam.ip_addresses.all() if vcenter_tag in ip.tags]
-        hosts = {ip: related for ip, related in hosts.items() if ip not in vcenter_ips}
+        log.debug('vCenter IP addresses to exclude from scan: %s', vcenter_ips)
+        target_hosts = filter_networks(target_prefixes, vcenter_ips)
+
+        # Scan networks
+        hosts = self.scan_networks(target_hosts)
+        if not hosts:
+            log.error("A critical error occurred while scanning the network, stopping")
+            return
 
         # NetBox objects to verify, and create or update
         nb_objects = self.process_scan_results(hosts)
         return nb_objects
 
-    def scan_networks(self, prefixes: List[str]) -> Optional[dict]:
+    def scan_networks(self, target_list: List[str]) -> Optional[dict]:
         """Scan given networks using the Network mapper and detect hardware platforms and operating systems"""
         # Initialize Nmap scanner
         try:
@@ -54,7 +85,9 @@ class Module:
         nmap_arguments.extend(self.config['nmap_additional_args'].split(' '))
 
         log.info('Network scanning started')
-        scan_results = nmap.scan(args2str(prefixes), arguments=args2str(nmap_arguments), sudo=True)
+        log.debug('Scan targets: %s', target_list)
+        log.debug('Nmap arguments: %s', nmap_arguments)
+        scan_results = nmap.scan(args2str(target_list), arguments=args2str(nmap_arguments), sudo=True)
         return scan_results['scan']
 
     @staticmethod
