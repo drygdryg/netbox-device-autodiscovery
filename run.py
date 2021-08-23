@@ -1,5 +1,6 @@
 import argparse
 from collections import namedtuple, defaultdict
+from typing import Optional
 
 import pynetbox
 
@@ -125,7 +126,7 @@ def fetch_assigned_interface_id(obj: dict) -> dict:
     return obj
 
 
-def create_or_update_nb_obj(obj_type: str, obj: dict) -> int:
+def create_or_update_nb_obj(obj_type: str, obj: dict) -> Optional[int]:
     """
     Checks whether a NetBox object exists and matches.
     If object does not exist or does not match, it will be created or updated.
@@ -145,6 +146,11 @@ def create_or_update_nb_obj(obj_type: str, obj: dict) -> int:
 
     existing_nb_obj = getattr(getattr(nb, api_app), api_model).get(**query_params)
     if existing_nb_obj:
+        if obj_type in NETBOX_OBJECTS_DELETION_ORDER:  # Check whether the object supports tagging
+            if 'Autodiscovered' not in (tag.name for tag in existing_nb_obj.tags):
+                # Don't modify existing objects without the 'Autodiscovered' tag
+                log.debug('NetBox %s object "%s" skipped because has no "Autodiscovered" tag', obj_type, obj[query_key])
+                return None
         log.debug(
             "NetBox %s object '%s' already exists. Comparing values.",
             obj_type, obj[query_key]
@@ -224,8 +230,8 @@ def main():
                 continue
             log.info("Initiated sync of %s objects to NetBox", obj_type)
             for obj in nb_objects[obj_type]:
-                obj_id = create_or_update_nb_obj(obj_type, obj)
-                affected_nb_objects[obj_type].append(obj_id)
+                if obj_id := create_or_update_nb_obj(obj_type, obj):
+                    affected_nb_objects[obj_type].append(obj_id)
             log.info("Finished sync of %s objects to NetBox", obj_type)
         log.info(f'Module "{module_name}" execution completed')
 
@@ -264,7 +270,15 @@ if __name__ == '__main__':
         help="Remove all auto discovered objects which support tagging from NetBox and exit. "
              "This is helpful if you want to start fresh or stop using this script."
     )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true",
+        help="Increase verbosity level This overrides the log level in "
+             "the settings file. Intended for debugging purposes only"
+    )
     args = parser.parse_args()
+    if args.verbose:
+        log.setLevel('debug')
+        log.debug("Log level has been overridden by the --verbose argument")
     if args.cleanup:
         cleanup()
     else:
