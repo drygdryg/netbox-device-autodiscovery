@@ -64,12 +64,16 @@ def recognize_by_http(ip: str, port=80, http_timeout=3) -> Optional[Device]:
         if 'IP Office Application Server' in r.text:
             return Device('Avaya', 'IP Office application server', 'Server', None)
         return Device('Avaya', 'IP Office', 'IP PBX', None)
+    elif 'NPort Web Console' in r.text:
+        return Device('MOXA', 'NPort', 'Other', None)
 
-    # Try to detect and follow HTML redirect
+    # Try to detect and follow redirects
     if ('Content-Type' in r.headers) and (r.headers['Content-Type'] == 'text/html'):
-        url = html.fromstring(r.text).xpath('//meta[@http-equiv="refresh"]/@content')
-        if url:
+        if url := html.fromstring(r.text).xpath('//meta[@http-equiv="refresh"]/@content'):
             url = url[0][url[0].lower().find('url=') + 4:]
+        elif url := re.search(r'location\.href="(.*)"', r.text.lower().replace('\n', '').replace(' ', '')):
+            url = url.group(1)
+        if url:
             r = safe_http_get(f'{base_url}/{url}')
             if str_contains(r.text, ('Bizerba GmbH & Co. KG', 'Labeler Master', 'homepage.html')):
                 # Bizerba labeling system
