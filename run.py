@@ -277,7 +277,7 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
     if args.verbose:
-        log.setLevel('debug')
+        log.setLevel('DEBUG')
         log.debug("Log level has been overridden by the --verbose argument")
     if args.cleanup:
         cleanup()
