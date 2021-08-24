@@ -150,15 +150,21 @@ class Module:
                     pass
         else:
             log.info(f"OS match accuracy too low {os_match['accuracy']}, OS fingerprint recognition is skipped…")
-        # Generic cases
+
+    def active_device_recognition(self, ip_addr: str, open_ports: List[int]) -> Optional[Device]:
+        """
+        Recognizes device model based on active interaction with it using available protocols
+
+        :param ip_addr: IP addresses of the host
+        :param open_ports: List of open TCP ports
+        """
         if 80 in open_ports:
             if device := recognize_by_http(ip_addr, 80):
                 return device
-        if 515 in open_ports:
-            return Device('Generic', 'printer', 'Printer', None)
         if 161 in open_ports:
-            if device := recognize_by_snmp(ip_addr, 161):
-                return device
+            for snmp_community in self.config['snmp_communities']:
+                if device := recognize_by_snmp(ip_addr, 161, snmp_community):
+                    return device
 
     def process_scan_results(self, nmap_results: dict) -> dict:
         """Converts the results of an Nmap network scan to NetBox entities"""
@@ -166,13 +172,20 @@ class Module:
         nb_objects = defaultdict(list)
         for ip, scan_results in nmap_results.items():
             log.info(f'Recognition of the device with IP {ip} is started…')
-            if not scan_results['osmatch']:
-                log.info(f'No OS matches found, IP {ip} skipped')
-                continue
-
             open_ports = [port for port, qualities in scan_results['tcp'].items() if
                           qualities['state'] == 'open'] if 'tcp' in scan_results else []
-            recognized_device = self.recognize_device(ip, open_ports, scan_results['osmatch'])
+            recognized_device = None
+            if scan_results['osmatch']:
+                # Try to use Nmap TCP/IP OS fingerprint recognition
+                recognized_device = self.recognize_device(ip, open_ports, scan_results['osmatch'])
+            if not recognized_device:
+                # Try to use active recognition
+                recognized_device = self.active_device_recognition(ip, open_ports)
+            if not recognized_device:
+                # Generic cases
+                if 515 in open_ports:
+                    recognized_device = Device('Generic', 'printer', 'Printer', None)
+
             if not recognized_device:
                 log.info('Failed to recognize the device, skipped')
                 continue

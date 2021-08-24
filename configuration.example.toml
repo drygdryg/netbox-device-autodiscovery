@@ -17,6 +17,7 @@ modules = [
 [nmap_network_scanner]
 nmap_guess_os = true
 nmap_additional_args = "-T4 -n"
+snmp_communities = ["public", "abcdef12345"]
 
 [avaya_ip_office_phones_enumerator]
 pbx_address = "10.0.0.1"
