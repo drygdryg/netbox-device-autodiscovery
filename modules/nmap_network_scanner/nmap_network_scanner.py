@@ -161,7 +161,7 @@ class Module:
         if 80 in open_ports:
             if device := recognize_by_http(ip_addr, 80):
                 return device
-        if 161 in open_ports:
+        if self.config['snmp_recognition_enabled']:
             for snmp_community in self.config['snmp_communities']:
                 if device := recognize_by_snmp(ip_addr, 161, snmp_community, retries=self.config['snmp_retry_count']):
                     return device

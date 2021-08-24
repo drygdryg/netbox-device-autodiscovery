@@ -1,3 +1,4 @@
+import functools
 import re
 from typing import Optional, Iterable, Union
 
@@ -111,10 +112,29 @@ def snmp_get(ip: str, oid: Union[str, tuple], port=161, snmp_community: str = 'p
 
 def recognize_by_snmp(ip: str, port=161, snmp_community: str = 'public', retries: int = 2) -> Optional[Device]:
     """Recognize device with a built-in SNMP agent, based on standard SNMP MIBs"""
-    if system_description := snmp_get(ip, ('SNMPv2-MIB', 'sysDescr', 0), port, snmp_community, retries=retries):
+    snmp_get_request = functools.partial(snmp_get, ip=ip, port=port, snmp_community=snmp_community, retries=retries)
+    if system_description := snmp_get_request(oid=('SNMPv2-MIB', 'sysDescr', 0)):
         if system_description.startswith('UAP-AC-LR'):
             return Device('Ubiquiti', 'UniFi AP AC LR', 'Wi-Fi AP', 'AirOS')
         elif system_description.startswith('UAP-AC-Mesh'):
             return Device('Ubiquiti', 'UniFi AC Mesh', 'Wi-Fi Mesh', 'AirOS')
         elif system_description.startswith('Cisco NX-OS(tm)'):
             return Device('Cisco', 'Nexus', 'Switch', 'NX-OS')
+        elif system_description.startswith('EdgeOS'):
+            manufacturer, role, platform = 'Ubiquiti', 'Router', 'EdgeOS'
+            if system_name := snmp_get_request(oid=('SNMPv2-MIB', 'sysName', 0)):
+                if system_name.startswith('RT-S0-ER4'):
+                    return Device(manufacturer, 'ER‑4', role, platform)
+            return Device(manufacturer, 'router', role, platform)
+        elif system_description.startswith('EdgeSwitch'):
+            manufacturer, role, platform = 'Ubiquiti', 'Switch', 'EdgeSwitch'
+            if system_name := snmp_get_request(oid=('SNMPv2-MIB', 'sysName', 0)):
+                if system_name.startswith('SW-S1-ES24p'):
+                    return Device(manufacturer, 'ES-24', role, platform)
+                elif system_name.startswith('SW-S0-ES16XG'):
+                    return Device(manufacturer, 'ES‑16‑XG', role, platform)
+                elif system_name.startswith('SW-S1-ES48'):
+                    return Device(manufacturer, 'ES-48', role, platform)
+            return Device(manufacturer, 'switch', role, platform)
+        elif system_description.startswith('Datacard SD260'):
+            return Device('Datacard', 'SD260', 'Printer', None)

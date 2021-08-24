@@ -17,6 +17,7 @@ modules = [
 [nmap_network_scanner]
 nmap_guess_os = true
 nmap_additional_args = "-T4 -n"
+snmp_recognition_enabled = true
 snmp_communities = ["public", "abcdef12345"]
 snmp_retry_count = 2
 
