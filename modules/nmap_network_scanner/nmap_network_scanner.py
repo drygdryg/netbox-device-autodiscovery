@@ -163,7 +163,7 @@ class Module:
                 return device
         if 161 in open_ports:
             for snmp_community in self.config['snmp_communities']:
-                if device := recognize_by_snmp(ip_addr, 161, snmp_community):
+                if device := recognize_by_snmp(ip_addr, 161, snmp_community, retries=self.config['snmp_retry_count']):
                     return device
 
     def process_scan_results(self, nmap_results: dict) -> dict:

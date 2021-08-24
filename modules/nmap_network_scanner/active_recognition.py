@@ -85,19 +85,23 @@ def recognize_by_http(ip: str, port=80, http_timeout=3) -> Optional[Device]:
                 return Device('Generic', 'NAS', 'NAS', None)
 
 
-def snmp_get(ip: str, oid: Union[str, tuple], port=161, snmp_community: str = 'public') -> Optional[str]:
+def snmp_get(ip: str, oid: Union[str, tuple], port=161, snmp_community: str = 'public', timeout: int = 1,
+             retries: int = 2) -> Optional[str]:
     """
     Send SNMP Get requests
     :param ip: target host IP address
     :param oid: SNMP object identifier
     :param port: target host UDP port
     :param snmp_community: SNMP community string to authorize
+    :param timeout: response timeout in seconds
+    :param retries: maximum number of request retries, 0 retries means just a single request
     """
     if isinstance(oid, tuple):
         object_identity = ObjectIdentity(*oid)
     else:
         object_identity = ObjectIdentity(oid)
-    iterator = getCmd(SnmpEngine(), CommunityData(snmp_community), UdpTransportTarget((ip, port)),
+    iterator = getCmd(SnmpEngine(), CommunityData(snmp_community),
+                      UdpTransportTarget((ip, port), timeout=timeout, retries=retries),
                       ContextData(), ObjectType(object_identity))
     error_indication, error_status, error_index, var_binds = next(iterator)
     if error_indication or error_status:
@@ -105,9 +109,9 @@ def snmp_get(ip: str, oid: Union[str, tuple], port=161, snmp_community: str = 'p
     return var_binds[0].prettyPrint().split('=')[-1].strip()
 
 
-def recognize_by_snmp(ip: str, port=161, snmp_community: str = 'public') -> Optional[Device]:
+def recognize_by_snmp(ip: str, port=161, snmp_community: str = 'public', retries: int = 2) -> Optional[Device]:
     """Recognize device with a built-in SNMP agent, based on standard SNMP MIBs"""
-    if system_description := snmp_get(ip, ('SNMPv2-MIB', 'sysDescr', 0), port, snmp_community):
+    if system_description := snmp_get(ip, ('SNMPv2-MIB', 'sysDescr', 0), port, snmp_community, retries=retries):
         if system_description.startswith('UAP-AC-LR'):
             return Device('Ubiquiti', 'UniFi AP AC LR', 'Wi-Fi AP', 'AirOS')
         elif system_description.startswith('UAP-AC-Mesh'):
