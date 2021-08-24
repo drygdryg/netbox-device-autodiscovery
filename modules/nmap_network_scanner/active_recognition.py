@@ -29,7 +29,7 @@ def recognize_by_http(ip: str, port=80, http_timeout=3) -> Optional[Device]:
     """Recognize device with a web interface: printers, routers, etc."""
     base_url = f'http://{ip}:{port}'
     r = safe_http_get(f'{base_url}/', timeout=http_timeout)
-    if not r:
+    if r is None:
         return
 
     # Recognize device by the Server response header
@@ -112,3 +112,5 @@ def recognize_by_snmp(ip: str, port=161, snmp_community: str = 'public') -> Opti
             return Device('Ubiquiti', 'UniFi AP AC LR', 'Wi-Fi AP', 'AirOS')
         elif system_description.startswith('UAP-AC-Mesh'):
             return Device('Ubiquiti', 'UniFi AC Mesh', 'Wi-Fi Mesh', 'AirOS')
+        elif system_description.startswith('Cisco NX-OS(tm)'):
+            return Device('Cisco', 'Nexus', 'Switch', 'NX-OS')
