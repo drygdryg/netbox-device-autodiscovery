@@ -67,6 +67,11 @@ def recognize_by_http(ip: str, port=80, http_timeout=3) -> Optional[Device]:
         return Device('Avaya', 'IP Office', 'IP PBX', None)
     elif 'NPort Web Console' in r.text:
         return Device('MOXA', 'NPort', 'Other', None)
+    elif str_contains(r.text, ('/framework/Unified.css', '/framework/Unified.js')):
+        # Various HP printers
+        if r := safe_http_get(f'{base_url}/DevMgmt/ProductConfigDyn.xml'):
+            if match := re.search(r'HP LaserJet Pro MFP (\w+)', r.text):
+                return Device('HP', f'LaserJet Pro {match.group(1)}', 'MFP', None)
 
     # Try to detect and follow redirects
     if ('Content-Type' in r.headers) and (r.headers['Content-Type'] == 'text/html'):
