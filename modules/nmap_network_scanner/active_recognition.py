@@ -26,6 +26,30 @@ def str_contains(string: str, substrings: Iterable[str]) -> bool:
     return True
 
 
+def detect_webpage_redirect(page_content: str) -> Optional[str]:
+    """
+    Tries to detect in-content redirects (HTML meta, JavaScript, etc.) and extract target URL
+    :param page_content: HTML webpage content
+    :return: relative URL
+    """
+    def html_meta_refresh():
+        try:
+            root = html.fromstring(page_content)
+        except ValueError:
+            return
+        if t := root.xpath('//meta[@http-equiv="refresh"]/@content'):
+            return t[0][t[0].lower().find('url=') + 4:]
+
+    def javascript_location_href():
+        if t := re.search(r'location\.href="(.*)"', page_content.lower().replace('\n', '').replace(' ', '')):
+            return t.group(1)
+
+    extractors = [html_meta_refresh, javascript_location_href]
+    for extractor in extractors:
+        if url := extractor():
+            return url
+
+
 def recognize_by_http(ip: str, port=80, http_timeout=3) -> Optional[Device]:
     """Recognize device with a web interface: printers, routers, etc."""
     base_url = f'http://{ip}:{port}'
@@ -73,22 +97,18 @@ def recognize_by_http(ip: str, port=80, http_timeout=3) -> Optional[Device]:
             if match := re.search(r'HP LaserJet Pro MFP (\w+)', r.text):
                 return Device('HP', f'LaserJet Pro {match.group(1)}', 'MFP', None)
 
-    # Try to detect and follow redirects
+    # Try to detect redirects inside the page and follow them
     if ('Content-Type' in r.headers) and (r.headers['Content-Type'] == 'text/html'):
-        if url := html.fromstring(r.text).xpath('//meta[@http-equiv="refresh"]/@content'):
-            url = url[0][url[0].lower().find('url=') + 4:]
-        elif url := re.search(r'location\.href="(.*)"', r.text.lower().replace('\n', '').replace(' ', '')):
-            url = url.group(1)
-        if url:
-            r = safe_http_get(f'{base_url}/{url}')
-            if str_contains(r.text, ('Bizerba GmbH & Co. KG', 'Labeler Master', 'homepage.html')):
-                # Bizerba labeling system
-                return Device('Bizerba', 'Labeler master', 'Labeling system', None)
-            elif ('Naim Configuration' in r.text) or ('Mu-so Configuration' in r.text):
-                # Naim network audio device
-                return Device('Naim', 'network media device', 'Other', 'Linux')
-            elif 'NAS01' in r.text:
-                return Device('Generic', 'NAS', 'NAS', None)
+        if url := detect_webpage_redirect(r.text):
+            if (r := safe_http_get(f'{base_url}/{url}')) and r.text:
+                if str_contains(r.text, ('Bizerba GmbH & Co. KG', 'Labeler Master', 'homepage.html')):
+                    # Bizerba labeling system
+                    return Device('Bizerba', 'Labeler master', 'Labeling system', None)
+                elif ('Naim Configuration' in r.text) or ('Mu-so Configuration' in r.text):
+                    # Naim network audio device
+                    return Device('Naim', 'network media device', 'Other', 'Linux')
+                elif 'NAS01' in r.text:
+                    return Device('Generic', 'NAS', 'NAS', None)
 
 
 def snmp_get(ip: str, oid: Union[str, tuple], port=161, snmp_community: str = 'public', timeout: int = 1,
