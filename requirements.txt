@@ -2,3 +2,4 @@ pynetbox
 toml
 python-nmap==0.6.4
 lxml==4.6.3
+pysnmp==4.4.12
