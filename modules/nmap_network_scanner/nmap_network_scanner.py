@@ -3,7 +3,6 @@ from collections import defaultdict
 import ipaddress
 from itertools import groupby
 from typing import List, Optional
-
 from nmap import PortScanner, PortScannerError
 
 from logger import log
@@ -53,12 +52,21 @@ class Module:
         """Returns dictionary of NetBox objects to verify, and create or update"""
         # Obtain IP prefixes to scan, excluding prefixes with "Do not autodiscover" tag
         autodiscovery_disabled_tag = nb.extras.tags.get(slug='do-not-autodiscover')
-        target_prefixes = [p.prefix for p in nb.ipam.prefixes.all() if autodiscovery_disabled_tag not in p.tags]
+        filters = self.config.get('filters')
+        if filters:
+            filter_params = {item: filters[index + 1] for index, item in enumerate(filters) if index % 2 == 0}
+            log.info(f"Using Filter prefix filter {filter_params}")
+            target_prefixes = [p.prefix for p in nb.ipam.prefixes.filter(**filter_params) ]
+        else:
+            log.info("Using All Prefix")
+            target_prefixes = [p.prefix for p in nb.ipam.prefixes.all()
+                               if autodiscovery_disabled_tag not in p.tags]
 
         # Filter out VMWare vCenter IPs
         vcenter_tag = nb.extras.tags.get(name='vCenter')
         vcenter_ips = [ip.address.split('/')[0] for ip in nb.ipam.ip_addresses.all() if vcenter_tag in ip.tags]
         log.debug('vCenter IP addresses to exclude from scan: %s', vcenter_ips)
+
         target_hosts = filter_networks(target_prefixes, vcenter_ips)
 
         # Scan networks
@@ -79,16 +87,20 @@ class Module:
         except PortScannerError as error:
             log.error("Nmap scanner critical error occurred: %s", error.value)
             return
-        nmap_arguments = ['-sS', '-O']
+        nmap_arguments = []
         if self.config['nmap_guess_os']:
             nmap_arguments.append('--osscan-guess')
         nmap_arguments.extend(self.config['nmap_additional_args'].split(' '))
 
         log.info('Network scanning started')
         log.debug('Scan targets: %s', target_list)
-        log.debug('Nmap arguments: %s', nmap_arguments)
-        scan_results = nmap.scan(args2str(target_list), arguments=args2str(nmap_arguments), sudo=True)
-        return scan_results['scan']
+        log.debug('Nmap arguments: %s', args2str(nmap_arguments))
+        try:
+            scan_results = nmap.scan(args2str(target_list), arguments=args2str(nmap_arguments), sudo=False)
+            return scan_results['scan']
+        except Exception as e:
+            log.error(f"Critical error scanning {target_list} - {e}")
+
 
     @staticmethod
     def recognize_device(ip_addr: str, open_ports: List[int], os_matches: List[dict]) -> Optional[Device]:
@@ -175,7 +187,7 @@ class Module:
             open_ports = [port for port, qualities in scan_results['tcp'].items() if
                           qualities['state'] == 'open'] if 'tcp' in scan_results else []
             recognized_device = None
-            if scan_results['osmatch']:
+            if scan_results.get('osmatch'):
                 # Try to use Nmap TCP/IP OS fingerprint recognition
                 recognized_device = self.recognize_device(ip, open_ports, scan_results['osmatch'])
             if not recognized_device:
@@ -187,29 +199,33 @@ class Module:
                     recognized_device = Device('Generic', 'printer', 'Printer', None)
 
             if not recognized_device:
-                log.info('Failed to recognize the device, skipped')
-                continue
+                log.info('Failed to recognize the device, continue without device')
 
-            nb_objects['manufacturers'].append(netbox_template.manufacturer(recognized_device.manufacturer))
-            nb_objects['device_types'].append(
-                netbox_template.device_type(recognized_device.manufacturer, recognized_device.model))
-            if recognized_device.platform:
-                nb_objects['platforms'].append(netbox_template.platform(recognized_device.platform))
+            if 'manufacturers' in nb_objects:
+                nb_objects['manufacturers'].append(netbox_template.manufacturer(recognized_device.manufacturer))
+
+            if 'device_types' in nb_objects:
+                nb_objects['device_types'].append(
+                    netbox_template.device_type(recognized_device.manufacturer, recognized_device.model))
 
             # Use IP address as the device name
             device_name = ip
-            nb_objects['devices'].append(
-                netbox_template.device(
-                    name=device_name, device_role=recognized_device.role, manufacturer=recognized_device.manufacturer,
-                    model=recognized_device.model, platform=recognized_device.platform
-                ))
-            nb_objects['interfaces'].append(netbox_template.device_interface(device=device_name, name='vNIC'))
+            if recognized_device and recognized_device.platform:
+                nb_objects['platforms'].append(netbox_template.platform(recognized_device.platform))
+
+                nb_objects['devices'].append(
+                    netbox_template.device(
+                        name=device_name, device_role=recognized_device.role, manufacturer=recognized_device.manufacturer,
+                        model=recognized_device.model, platform=recognized_device.platform
+                    ))
+                nb_objects['interfaces'].append(netbox_template.device_interface(device=device_name, name='vNIC'))
+                log.info(
+                    'Device recognized: {}'.format(
+                        ', '.join('='.join((k, str(v))) for k, v in recognized_device._asdict().items()))
+                )
 
             dns_name = scan_results['hostnames'][0]['name'] if scan_results['hostnames'][0]['name'] else None
             nb_objects['ip_addresses'].append(
                 netbox_template.ip_address(ip + '/32', device=device_name, interface='vNIC', dns_name=dns_name))
-            log.info(
-                'Device recognized: {}'.format(
-                    ', '.join('='.join((k, str(v))) for k, v in recognized_device._asdict().items()))
-            )
+
         return {k: remove_duplicates(v) for k, v in nb_objects.items()}

@@ -2,6 +2,9 @@
 url = "https://netbox.example.com"
 api_token = "k8yj25sc9s4xveqodjdo6awasxh75fk128m7ybac"
 default_devices_site = "Autodiscovered devices"
+# Set to True to use threading. Python 3 only
+threading = true
+
 
 [logging]
 file = false
@@ -20,6 +23,12 @@ nmap_additional_args = "-T4 -n"
 snmp_recognition_enabled = true
 snmp_communities = ["public", "abcdef12345"]
 snmp_retry_count = 2
+# You can filter all prefix by each value, in this example using IPAM prefixes in site abc.
+# if filter isn't present all prefixes will be utilized
+# filters = ['site', 'site1']
+# filters = ['prefix', '10.1.1.0/24']
+# filters = ['site', 'site1', 'prefix', '10.1.1.0/24']
+
 
 [avaya_ip_office_phones_enumerator]
 pbx_address = "10.0.0.1"

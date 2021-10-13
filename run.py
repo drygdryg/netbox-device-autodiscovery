@@ -1,15 +1,16 @@
 import argparse
 from collections import namedtuple, defaultdict
 from typing import Optional
-
 import pynetbox
-
 from configuration import config
 from shared_objects import NB_DEFAULT_SITE
 from utils import format_slug
 from logger import log
 
-nb = pynetbox.api(url=config['netbox']['url'], token=config['netbox']['api_token'])
+
+netbox_config = config.get('netbox', {})
+nb = pynetbox.api(url=netbox_config.get('url'), token=netbox_config.get('api_token'),
+                  threading=netbox_config.get('threading', True))
 
 # Properties of NetBox object types
 NetBoxObjectProperties = namedtuple('NetBoxObjectProperties', ('api_app', 'api_model', 'key'))
