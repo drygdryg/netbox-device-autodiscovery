@@ -96,7 +96,8 @@ class Module:
         log.debug('Scan targets: %s', target_list)
         log.debug('Nmap arguments: %s', args2str(nmap_arguments))
         try:
-            scan_results = nmap.scan(args2str(target_list), arguments=args2str(nmap_arguments), sudo=False)
+            use_sudo = self.config.get('nmap_use_sudo', True)
+            scan_results = nmap.scan(args2str(target_list), arguments=args2str(nmap_arguments), sudo=use_sudo)
             return scan_results['scan']
         except Exception as e:
             log.error(f"Critical error scanning {target_list} - {e}")
