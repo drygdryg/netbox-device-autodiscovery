@@ -57,7 +57,7 @@ def verify_prerequisites():
         ],
         'tags': [
             {
-                'name': 'Autodiscovered',
+                'name': 'auto-discovered',
                 'slug': 'autodiscovered',
                 'description': 'Object automatically discovered by the netbox-device-autodiscovery script'
             },
@@ -148,9 +148,9 @@ def create_or_update_nb_obj(obj_type: str, obj: dict) -> Optional[int]:
     existing_nb_obj = getattr(getattr(nb, api_app), api_model).get(**query_params)
     if existing_nb_obj:
         if obj_type in NETBOX_OBJECTS_DELETION_ORDER:  # Check whether the object supports tagging
-            if 'Autodiscovered' not in (tag.name for tag in existing_nb_obj.tags):
+            if 'auto-discovered' not in (tag.name for tag in existing_nb_obj.tags):
                 # Don't modify existing objects without the 'Autodiscovered' tag
-                log.debug('NetBox %s object "%s" skipped because has no "Autodiscovered" tag', obj_type, obj[query_key])
+                log.debug('NetBox %s object "%s" skipped because has no "auto-discovered" tag', obj_type, obj[query_key])
                 return None
         log.debug(
             "NetBox %s object '%s' already exists. Comparing values.",
@@ -191,7 +191,7 @@ def create_or_update_nb_obj(obj_type: str, obj: dict) -> Optional[int]:
 
 def cleanup():
     """Remove all auto discovered objects which support tagging from NetBox"""
-    autodiscovered_tag = nb.extras.tags.get(name='Autodiscovered')
+    autodiscovered_tag = nb.extras.tags.get(name='auto-discovered')
     for obj_type in NETBOX_OBJECTS_DELETION_ORDER:
         log.info("Initiated deletion of %s objects from NetBox", obj_type)
         api_app = NETBOX_OBJECTS_PROPERTIES[obj_type].api_app
@@ -202,6 +202,7 @@ def cleanup():
                 "Deleting '%s' object of type '%s'",
                 getattr(obj, NETBOX_OBJECTS_PROPERTIES[obj_type].key), obj_type)
             try:
+
                 obj.delete()
             except pynetbox.core.query.RequestError:
                 log.warning('Failed to delete the object')
@@ -226,6 +227,8 @@ def main():
             log.warning(f'Execution of the module "{module_name}" yielded no results')
             continue
 
+        log.debug("nb_objects:", {nb_objects})
+
         for obj_type in NETBOX_OBJECTS_CREATION_ORDER:
             if obj_type not in nb_objects:
                 continue
@@ -237,7 +240,7 @@ def main():
         log.info(f'Module "{module_name}" execution completed')
 
     log.info('Initialized deletion of orphaned NetBox objects')
-    autodiscovered_tag = nb.extras.tags.get(name='Autodiscovered')
+    autodiscovered_tag = nb.extras.tags.get(name='auto-discovered')
     for obj_type in NETBOX_OBJECTS_DELETION_ORDER:
         log.info("Initiated deletion of %s objects from NetBox", obj_type)
         api_app = NETBOX_OBJECTS_PROPERTIES[obj_type].api_app

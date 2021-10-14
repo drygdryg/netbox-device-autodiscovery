@@ -47,16 +47,19 @@ def filter_networks(networks: List[str], ip_addresses: List[str]) -> List[str]:
 class Module:
     def __init__(self, config: dict):
         self.config = config
+        self.filters = self.config.get('filters')
+        self.filter_params = False
+        if self.filters:
+            self.filter_params = {item: self.filters[index + 1]
+                             for index, item in enumerate(self.filters) if index % 2 == 0}
 
     def run(self) -> Optional[dict]:
         """Returns dictionary of NetBox objects to verify, and create or update"""
         # Obtain IP prefixes to scan, excluding prefixes with "Do not autodiscover" tag
         autodiscovery_disabled_tag = nb.extras.tags.get(slug='do-not-autodiscover')
-        filters = self.config.get('filters')
-        if filters:
-            filter_params = {item: filters[index + 1] for index, item in enumerate(filters) if index % 2 == 0}
-            log.info(f"Using Filter prefix filter {filter_params}")
-            target_prefixes = [p.prefix for p in nb.ipam.prefixes.filter(**filter_params) ]
+        if self.filter_params:
+            log.info(f"Using Filter prefix filter {self.filter_params}")
+            target_prefixes = [p.prefix for p in nb.ipam.prefixes.filter(**self.filter_params) ]
         else:
             log.info("Using All Prefix")
             target_prefixes = [p.prefix for p in nb.ipam.prefixes.all()
