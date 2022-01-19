@@ -127,12 +127,20 @@ class Module:
                                 return Device(manufacturer, 'Catalyst', role, platform)
                         else:
                             return Device(manufacturer, 'switch', role, None)
+                    elif os_class['vendor'] == 'Juniper':
+                        manufacturer = 'Juniper'
+                        platform = os_class['osfamily']
+                        return Device(manufacturer, 'switch', role, platform)
                 elif os_class_type == 'router':
                     role = 'Router'
                     if os_class['vendor'] == 'Cisco':
                         manufacturer = 'Cisco'
                         if os_name.startswith('Cisco IOS'):
                             return Device(manufacturer, 'IOS router', role, os_class['osfamily'])
+                    elif os_class['vendor'] == 'Juniper':
+                        manufacturer = 'Juniper'
+                        platform = os_class['osfamily']
+                        return Device(manufacturer, 'router', role, platform)
                 elif os_class_type == 'printer':
                     role = 'Printer'
                     if (80 in open_ports) and (device := recognize_by_http(ip_addr, 80)):
@@ -147,7 +155,16 @@ class Module:
                         return Device('Ubiquiti', 'Wi-Fi access point', role, 'Linux')
                     return Device('Generic', 'Wi-Fi access point', role, None)
                 elif os_class_type == 'specialized':
-                    pass
+                    if os_class['vendor'] == 'Oracle':
+                        manufacturer = 'Oracle'
+                        platform = os_class['osfamily']
+                        if os_name.startswith("Oracle VM Server"):
+                            role = "Server"
+                            model = 'VM Server'
+                        else:
+                            role = "Other"
+                            model = "specialized"
+                        return Device(manufacturer, model, role, platform)
         else:
             log.info(f"OS match accuracy too low {os_match['accuracy']}, OS fingerprint recognition is skipped…")
 
@@ -162,7 +179,7 @@ class Module:
             if device := recognize_by_http(ip_addr, 80):
                 return device
         if self.config['snmp_recognition_enabled']:
-            for snmp_community in self.config['snmp_communities']:
+            for snmp_community in self.config['shared_snmp_communities']:
                 if device := recognize_by_snmp(ip_addr, 161, snmp_community, retries=self.config['snmp_retry_count']):
                     return device
 
