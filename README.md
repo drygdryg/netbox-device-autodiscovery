@@ -1,6 +1,12 @@
 # Auto device discovery script for NetBox
 ## Overview
 Script for automatically discovering network devices and adding them to NetBox. Supports multiple data sources and various types of devices (router, switch, printer, MFP, Wi-Fi and other).
+## Dependencies
+As root
+
+`pip3 install pynetbox toml lxml python-nmap`
+
+`apt install nmap`
 ## Setup
 Copy `configuration.example.toml` to `configuration.toml` and set the necessary settings.  
 The program has a modular system. You can enable or disable modules, change the order of their launch. To do this, change the `modules` list in the `configuration.toml` (you can comment out a module name to disable it).  
@@ -18,7 +24,7 @@ The following modules are currently implemented:
 ## Usage
 When using `nmap_network_scanner` module, run the script as a superuser
 ```
-usage: run.py [-h] [-c] [-v]
+usage: python3 run.py [-h] [-c] [-v]
 
 optional arguments:
   -h, --help     show this help message and exit
