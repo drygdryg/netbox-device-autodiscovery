@@ -1,6 +1,8 @@
 [netbox]
 url = "https://netbox.example.com"
 api_token = "k8yj25sc9s4xveqodjdo6awasxh75fk128m7ybac"
+# ssl_verify = false
+# ssl_verify = "/path/to/certfile"
 default_devices_site = "Autodiscovered devices"
 
 [logging]

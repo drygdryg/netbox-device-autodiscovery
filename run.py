@@ -10,6 +10,7 @@ from utils import format_slug
 from logger import log
 
 nb = pynetbox.api(url=config['netbox']['url'], token=config['netbox']['api_token'])
+nb.http_session.verify = config['netbox'].get('ssl_verify', True)
 
 # Properties of NetBox object types
 NetBoxObjectProperties = namedtuple('NetBoxObjectProperties', ('api_app', 'api_model', 'key'))
