@@ -5,12 +5,9 @@ from typing import Optional
 import pynetbox
 
 from configuration import config
-from shared_objects import NB_DEFAULT_SITE
+from shared_objects import nb, NB_DEFAULT_SITE
 from utils import format_slug
 from logger import log
-
-nb = pynetbox.api(url=config['netbox']['url'], token=config['netbox']['api_token'])
-nb.http_session.verify = config['netbox'].get('ssl_verify', True)
 
 # Properties of NetBox object types
 NetBoxObjectProperties = namedtuple('NetBoxObjectProperties', ('api_app', 'api_model', 'key'))
