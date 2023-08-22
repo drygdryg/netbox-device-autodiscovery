@@ -4,7 +4,7 @@ Script for automatically discovering network devices and adding them to NetBox. 
 ## Dependencies
 As root
 
-`pip3 install pynetbox toml lxml python-nmap`
+`pip3 install pynetbox toml lxml python-nmap pysnmp`
 
 `apt install nmap`
 ## Setup
