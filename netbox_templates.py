@@ -77,6 +77,7 @@ class NetBoxTemplate:
             site = self.default_site
         obj = {
             "name": name,
+            "role": {"name": device_role},
             "device_role": {"name": device_role},
             "device_type": {"manufacturer": {'name': manufacturer}, "model": model},
             "platform": {"name": platform} if platform else None,
